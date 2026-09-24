@@ -14,6 +14,7 @@ RESET = "\033[0m"
 GREEN = "\033[32m"
 RED = "\033[31m"
 YELLOW = "\033[33m"
+BLUE = "\033[34m"
 
 
 def print_message(message, color):
@@ -62,13 +63,14 @@ def main():
                          args=(stub, args.user, event_types), daemon=True).start()
 
     while True:
-        print(f"""
+        print(f"{BLUE}" + f"""
 === TaskFlow === (utilisateur: {args.user})
  1. Creer une tache        6. Commenter une tache
  2. Lister les taches      7. Supprimer une tache
  3. Voir une tache          8. Recherche multi-mots-cles
  4. Changer le statut       9. Evenements recus
- 5. Reassigner              0. Quitter""")
+ 5. Reassigner              0. Quitter
+""" + RESET)
         try:
             choice = input("choix > ").strip()
             if choice == "1":
