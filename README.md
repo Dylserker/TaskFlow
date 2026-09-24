@@ -19,8 +19,13 @@ Le prompt doit alors commencer par `(venv)`. Sinon, utilisez directement
 Si le venv a ete supprime ou est incomplet, recreez-le avec `python -m venv venv`,
 puis relancez `venv/bin/python -m pip install -r requirement.txt`.
 
-Dans un autre terminal: `python client.py --user alice`. Le test complet se lance avec
-`python test_flow.py`. Les fichiers `taskflow_pb2.py` et `taskflow_pb2_grpc.py` sont
+Dans un autre terminal, lancez l'interface graphique avec
+`venv/bin/python client.py --user alice`. La fenetre permet de creer, filtrer,
+modifier, commenter et supprimer les taches, de rechercher plusieurs mots-cles
+et de consulter les evenements recus. Le test complet se lance avec
+`venv/bin/python test_flow.py`. Sous Linux, installez aussi le paquet systeme Tk
+(par exemple `tk` ou `python3-tk` selon la distribution) si l'import Tkinter
+signale que `libtk8.6.so` est absent. Les fichiers `taskflow_pb2.py` et `taskflow_pb2_grpc.py` sont
 generes et ignores par Git.
 
 ## Comprendre le contrat protobuf
