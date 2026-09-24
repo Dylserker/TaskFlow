@@ -10,21 +10,33 @@ from interceptors import HeaderInterceptor
 
 STATUS_NAMES = {0: "TODO", 1: "IN_PROGRESS", 2: "DONE"}
 received_events = []
+RESET = "\033[0m"
+GREEN = "\033[32m"
+RED = "\033[31m"
+YELLOW = "\033[33m"
+
+
+def print_message(message, color):
+    print(f"{color}{message}{RESET}", flush=True)
 
 
 def print_event(event):
-    print(f"\n[{event.event_type}] {event.author}: {event.message}\n> ", end="", flush=True)
+    color = {"CREATED": GREEN, "DELETED": RED}.get(event.event_type, "")
+    suffix = RESET if color else ""
+    print(f"{color}\n[{event.event_type}] {event.author}: {event.message}"
+          f"{suffix}\n> ", end="", flush=True)
 
 
 def listen_events(stub, username, event_types):
     try:
-        stream = stub.Subscribe(taskflow_pb2.SubscribeRequest(username=username, event_types=event_types))
+        stream = stub.Subscribe(taskflow_pb2.SubscribeRequest(
+            username=username, event_types=event_types))
         for event in stream:
             received_events.append(event)
             print_event(event)
     except grpc.RpcError as error:
         if error.code() != grpc.StatusCode.CANCELLED:
-            print(f"flux coupe [{error.code().name}] : {error.details()}")
+            print_message(f"flux coupe [{error.code().name}] : {error.details()}", RED)
 
 
 def print_task(task):
@@ -46,7 +58,8 @@ def main():
     stub = taskflow_pb2_grpc.TaskFlowStub(channel)
     event_types = [event.strip().upper() for event in args.events.split(",") if event.strip()]
     if not args.no_listen:
-        threading.Thread(target=listen_events, args=(stub, args.user, event_types), daemon=True).start()
+        threading.Thread(target=listen_events,
+                         args=(stub, args.user, event_types), daemon=True).start()
 
     while True:
         print(f"""
@@ -60,10 +73,11 @@ def main():
             choice = input("choix > ").strip()
             if choice == "1":
                 response = stub.CreateTask(taskflow_pb2.CreateTaskRequest(
-                    title=input("titre > ").strip(), description=input("description > ").strip(),
-                    assigned_to=input("assigne a (vide = personne) > ").strip(), created_by=args.user),
-                    timeout=args.timeout)
-                print(f"Tache creee: {response.task.id}")
+                    title=input("titre > ").strip(),
+                    description=input("description > ").strip(),
+                    assigned_to=input("assigne a (vide = personne) > ").strip(),
+                    created_by=args.user), timeout=args.timeout)
+                print_message(f"Tache creee: {response.task.id}", GREEN)
             elif choice == "2":
                 status = input("statut (TODO, IN_PROGRESS, DONE, vide = tous) > ").strip().upper()
                 assigned = input("assigne (vide = tous) > ").strip()
@@ -75,29 +89,35 @@ def main():
                 for task in stub.ListTasks(request, timeout=args.timeout):
                     print_task(task)
             elif choice == "3":
-                task = stub.GetTask(taskflow_pb2.GetTaskRequest(id=input("id > ").strip()), timeout=args.timeout)
+                task = stub.GetTask(taskflow_pb2.GetTaskRequest(
+                    id=input("id > ").strip()), timeout=args.timeout)
                 print_task(task)
                 for comment in task.comments:
-                    print(f"  {comment.created_at.ToDatetime().isoformat()} {comment.author}: {comment.text}")
+                    print(f"  {comment.created_at.ToDatetime().isoformat()} "
+                          f"{comment.author}: {comment.text}")
             elif choice == "4":
                 status = input("statut (TODO, IN_PROGRESS, DONE) > ").strip().upper()
                 task = stub.UpdateStatus(taskflow_pb2.UpdateStatusRequest(
-                    id=input("id > ").strip(), new_status={name: value for value, name in STATUS_NAMES.items()}[status],
+                    id=input("id > ").strip(),
+                    new_status={name: value for value, name in STATUS_NAMES.items()}[status],
                     requested_by=args.user), timeout=args.timeout)
                 print_task(task)
             elif choice == "5":
                 task = stub.AssignTask(taskflow_pb2.AssignTaskRequest(
-                    id=input("id > ").strip(), new_assignee=input("nouvel assigne > ").strip(),
+                    id=input("id > ").strip(),
+                    new_assignee=input("nouvel assigne > ").strip(),
                     requested_by=args.user), timeout=args.timeout)
                 print_task(task)
             elif choice == "6":
                 task = stub.AddComment(taskflow_pb2.AddCommentRequest(
-                    id=input("id > ").strip(), author=args.user, text=input("commentaire > ").strip()), timeout=args.timeout)
+                    id=input("id > ").strip(), author=args.user,
+                    text=input("commentaire > ").strip()), timeout=args.timeout)
                 print_task(task)
             elif choice == "7":
                 stub.DeleteTask(taskflow_pb2.DeleteTaskRequest(
-                    id=input("id > ").strip(), requested_by=args.user), timeout=args.timeout)
-                print("Tache supprimee")
+                    id=input("id > ").strip(), requested_by=args.user),
+                    timeout=args.timeout)
+                print_message("Tache supprimee", RED)
             elif choice == "8":
                 keywords = []
                 while True:
@@ -105,7 +125,9 @@ def main():
                     if not keyword:
                         break
                     keywords.append(keyword)
-                summary = stub.SearchKeywords((taskflow_pb2.SearchEntry(keyword=keyword) for keyword in keywords), timeout=args.timeout)
+                summary = stub.SearchKeywords(
+                    (taskflow_pb2.SearchEntry(keyword=keyword)
+                     for keyword in keywords), timeout=args.timeout)
                 print(f"{summary.total_requests} requete(s)")
                 for hit in summary.results:
                     print(f"  {hit.keyword}: {hit.match_count}")
@@ -115,7 +137,8 @@ def main():
                 print("Au revoir !")
                 break
         except grpc.RpcError as error:
-            print(f"Erreur gRPC [{error.code().name}] : {error.details()}")
+            color = YELLOW if error.code() == grpc.StatusCode.PERMISSION_DENIED else RED
+            print_message(f"Erreur gRPC [{error.code().name}] : {error.details()}", color)
         except (KeyboardInterrupt, EOFError):
             print()
             break

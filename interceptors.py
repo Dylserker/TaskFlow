@@ -5,6 +5,12 @@ from datetime import datetime
 import grpc
 
 
+_RESET = "\033[0m"
+_GREEN = "\033[32m"
+_RED = "\033[31m"
+_YELLOW = "\033[33m"
+
+
 class LoggingInterceptor(grpc.ServerInterceptor):
     def intercept_service(self, continuation, handler_call_details):
         handler = continuation(handler_call_details)
@@ -71,9 +77,18 @@ class LoggingInterceptor(grpc.ServerInterceptor):
     @staticmethod
     def _log(method, user, context, started):
         code = context.code() or grpc.StatusCode.OK
-        print(f"[{datetime.now():%H:%M:%S}] {method} "
-              f"duration={int((time.perf_counter() - started) * 1000)}ms "
-              f"code={code.name} user={user}", flush=True)
+        message = (f"[{datetime.now():%H:%M:%S}] {method} "
+                   f"duration={int((time.perf_counter() - started) * 1000)}ms "
+                   f"code={code.name} user={user}")
+        if code == grpc.StatusCode.PERMISSION_DENIED:
+            color = _YELLOW
+        elif code != grpc.StatusCode.OK or method == "/taskflow.TaskFlow/DeleteTask":
+            color = _RED
+        elif method == "/taskflow.TaskFlow/CreateTask":
+            color = _GREEN
+        else:
+            color = ""
+        print(f"{color}{message}{_RESET if color else ''}", flush=True)
 
 
 class _ClientCallDetails(collections.namedtuple(
