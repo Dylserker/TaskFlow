@@ -2,7 +2,6 @@ import argparse
 import queue
 import threading
 import time
-import uuid
 from concurrent import futures
 
 import grpc
@@ -28,6 +27,7 @@ def _status_name(value: int) -> str:
 class TaskFlowService(taskflow_pb2_grpc.TaskFlowServicer):
     def __init__(self, slow: bool = False):
         self._tasks = {}
+        self._next_task_id = 1
         self._lock = threading.RLock()
         self._subscribers = []
         self._subs_lock = threading.Lock()
@@ -40,11 +40,13 @@ class TaskFlowService(taskflow_pb2_grpc.TaskFlowServicer):
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "created_by is required")
         if self._slow:
             time.sleep(5)
-        task = {"id": str(uuid.uuid4()), "title": request.title,
+        with self._lock:
+            task_id = str(self._next_task_id)
+            self._next_task_id += 1
+            task = {"id": task_id, "title": request.title,
                 "description": request.description, "status": taskflow_pb2.TODO,
                 "assigned_to": request.assigned_to, "created_by": request.created_by,
                 "created_at": _now(), "comments": []}
-        with self._lock:
             self._tasks[task["id"]] = task
             result = self._to_pb(task)
         self._publish("CREATED", task["id"], task["created_by"],
