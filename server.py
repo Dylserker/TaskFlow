@@ -57,6 +57,22 @@ class TaskFlowService(taskflow_pb2_grpc.TaskFlowServicer):
         with self._lock:
             return self._to_pb(self._get_or_abort(request.id, context))
 
+    def UpdateTask(self, request, context):
+        if not request.HasField("title") and not request.HasField("description"):
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "at least one field is required")
+        if request.HasField("title") and not request.title:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "title cannot be empty")
+        with self._lock:
+            task = self._get_or_abort(request.id, context)
+            if request.HasField("title"):
+                task["title"] = request.title
+            if request.HasField("description"):
+                task["description"] = request.description
+            result = self._to_pb(task)
+        self._publish("UPDATED", task["id"], request.requested_by,
+                      f'{request.requested_by} a modifié « {task["title"]} »')
+        return result
+
     def ListTasks(self, request, context):
         with self._lock:
             tasks = []

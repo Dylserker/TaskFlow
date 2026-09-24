@@ -86,6 +86,7 @@ class TaskFlowApp:
         actions = ttk.Frame(tab)
         actions.pack(fill="x", pady=(10, 0))
         ttk.Button(actions, text="Voir les details", command=self.show_task).pack(side="left")
+        ttk.Button(actions, text="Modifier", command=self.edit_task).pack(side="left", padx=6)
         ttk.Button(actions, text="Changer le statut", command=self.change_status).pack(side="left", padx=6)
         ttk.Button(actions, text="Reassigner", command=self.assign_task).pack(side="left")
         ttk.Button(actions, text="Commenter", command=self.comment_task).pack(side="left", padx=6)
@@ -136,7 +137,7 @@ class TaskFlowApp:
                 result = operation()
                 self.root.after(0, lambda: callback(result, None))
             except grpc.RpcError as error:
-                self.root.after(0, lambda: callback(None, error))
+                self.root.after(0, lambda error=error: callback(None, error))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -231,6 +232,35 @@ class TaskFlowApp:
         comments = "\n".join(f"{comment.author}: {comment.text}" for comment in task.comments) or "Aucun"
         messagebox.showinfo("Details de la tache", f"Titre: {task.title}\nStatut: {STATUS_NAMES[task.status]}\n"
                             f"Assigne a: {task.assigned_to or '-'}\n\n{task.description}\n\nCommentaires:\n{comments}")
+
+    def edit_task(self):
+        task_id = self._selected_or_warn()
+        if task_id:
+            self._rpc(lambda: self.stub.GetTask(
+                taskflow_pb2.GetTaskRequest(id=task_id), timeout=5), self.open_edit_dialog)
+
+    def open_edit_dialog(self, task, error):
+        if error:
+            self.show_error(error)
+            return
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Modifier la tache")
+        title = tk.StringVar(value=task.title)
+        ttk.Label(dialog, text="Titre").pack(anchor="w", padx=18, pady=(18, 6))
+        ttk.Entry(dialog, textvariable=title, width=50).pack(padx=18)
+        ttk.Label(dialog, text="Description").pack(anchor="w", padx=18, pady=(12, 6))
+        description = tk.Text(dialog, height=8, width=50)
+        description.insert("1.0", task.description)
+        description.pack(padx=18)
+        ttk.Button(dialog, text="Enregistrer", command=lambda: self._submit_edit(
+            dialog, task.id, title.get().strip(), description.get("1.0", "end").strip())).pack(pady=18)
+
+    def _submit_edit(self, dialog, task_id, title, description):
+        dialog.destroy()
+        request = taskflow_pb2.UpdateTaskRequest(id=task_id, requested_by=self.username.get().strip())
+        request.title = title
+        request.description = description
+        self._rpc(lambda: self.stub.UpdateTask(request, timeout=5), self.action_done)
 
     def change_status(self):
         task_id = self._selected_or_warn()

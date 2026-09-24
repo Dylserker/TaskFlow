@@ -28,6 +28,9 @@ def run_tests(stub, log_path):
     task_id = created.task.id
     task = stub.GetTask(pb.GetTaskRequest(id=task_id), timeout=3)
     assert task.title == "Rapport" and task.status == pb.TODO
+    task = stub.UpdateTask(pb.UpdateTaskRequest(
+        id=task_id, title="Rapport final", description="Version mise a jour", requested_by="alice"), timeout=3)
+    assert task.title == "Rapport final" and task.description == "Version mise a jour"
     task = stub.UpdateStatus(pb.UpdateStatusRequest(id=task_id, new_status=pb.DONE, requested_by="alice"), timeout=3)
     assert task.status == pb.DONE
     assert any(item.id == task_id for item in stub.ListTasks(pb.ListTasksRequest(), timeout=3))
